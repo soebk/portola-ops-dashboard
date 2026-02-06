@@ -20,7 +20,7 @@ Settlement monitoring dashboard built with Next.js + TypeScript + Tailwind CSS f
 ### Phase 3 ✅
 - New transaction auto-generation every 2 seconds
 - **Natural streaming** that pauses when user hovers over table
-- Prevents UX issues without intrusive banners
+- **Flash animation** highlights new transactions as they appear
 - Elegant hover-based pause mechanism
 
 ### Phase 4 ✅ FINAL
@@ -32,12 +32,13 @@ Settlement monitoring dashboard built with Next.js + TypeScript + Tailwind CSS f
 
 ## Technical Highlights
 
-- **Professional Dark Theme**: Sophisticated UI using oklch colors and advanced CSS techniques
-- **Natural Streaming UX**: Live transaction feed that pauses on hover to prevent interaction issues
+- **Dark Theme UI**: Professional design with proper contrast and visual hierarchy
+- **Natural Streaming UX**: Live transaction feed with flash animations for new entries
+- **Hover-Based Pause**: Streaming pauses when user hovers over table to prevent misclicks
+- **Working Super Admin Toggle**: Functional high-value transaction controls
 - **Robust Error Handling**: Uses Promise.allSettled for independent transaction processing  
-- **Security Model**: Super Admin controls for high-value transactions
-- **Advanced Animations**: Smooth transitions, pulse effects, and staggered row animations
-- **Production-Ready**: Clean TypeScript, responsive design, professional typography
+- **Advanced Animations**: Flash effects, smooth transitions, and staggered row reveals
+- **Production-Ready**: Clean TypeScript, responsive design, proper accessibility
 
 ## Development
 
