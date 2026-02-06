@@ -40,10 +40,49 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([])
+  const [transactionCounter, setTransactionCounter] = useState(51) // Start after initial 50
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
   }, [])
+
+  // Generate a single new transaction
+  const generateNewTransaction = (): Transaction => {
+    const names = [
+      'Alex Chen', 'Jordan Williams', 'Taylor Brown', 'Casey Johnson', 'Morgan Davis',
+      'Jamie Wilson', 'Riley Anderson', 'Avery Taylor', 'Quinn Moore', 'Parker Jackson',
+      'Cameron White', 'Blake Harris', 'Sage Martin', 'River Thompson', 'Sky Garcia',
+      'Phoenix Rodriguez', 'Rowan Lewis', 'Dakota Lee', 'Storm Walker', 'Nova Hall'
+    ]
+    
+    const statuses: Transaction['status'][] = ['Pending', 'Cleared', 'Failed']
+    
+    return {
+      id: `TXN-${String(transactionCounter).padStart(3, '0')}`,
+      clientName: names[Math.floor(Math.random() * names.length)],
+      amount: Math.floor(Math.random() * 50000) + 1000,
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      timestamp: new Date().toISOString()
+    }
+  }
+
+  // Add new transaction every 2 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newTransaction = generateNewTransaction()
+      setPendingTransactions(prev => [newTransaction, ...prev])
+      setTransactionCounter(prev => prev + 1)
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [transactionCounter])
+
+  // Load pending transactions into main list
+  const loadPendingTransactions = () => {
+    setTransactions(prev => [...pendingTransactions, ...prev])
+    setPendingTransactions([])
+  }
 
   const clearFunds = async (transactionId: string) => {
     const transaction = transactions.find(t => t.id === transactionId)
@@ -137,6 +176,33 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* New transactions banner */}
+          {pendingTransactions.length > 0 && (
+            <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">
+                      {pendingTransactions.length} new transaction{pendingTransactions.length !== 1 ? 's' : ''} available
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      Click to load into table and prevent row shifting
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={loadPendingTransactions}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Load {pendingTransactions.length} Transaction{pendingTransactions.length !== 1 ? 's' : ''}
+                </button>
+              </div>
+            </div>
+          )}
           
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
