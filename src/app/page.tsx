@@ -240,15 +240,17 @@ export default function Dashboard() {
 
     const result = await mockClearTransaction(transactionId)
 
-    if (result.success) {
-      setTransactions(prev =>
-        prev.map(transaction =>
-          transaction.id === transactionId
-            ? { ...transaction, status: 'Cleared' }
-            : transaction
-        )
+    // Update transaction status based on result (success → Cleared, failure → Failed)
+    setTransactions(prev =>
+      prev.map(transaction =>
+        transaction.id === transactionId
+          ? {
+              ...transaction,
+              status: result.success ? 'Cleared' : 'Failed'
+            }
+          : transaction
       )
-    }
+    )
 
     setProcessingIds(prev => {
       const newSet = new Set(prev)
@@ -269,9 +271,9 @@ export default function Dashboard() {
     setBulkProcessing(true)
     setShowConfirmModal(false)
     setConfirmText('')
-
+    
     const selectedTransactions = Array.from(selectedIds)
-
+    
     // Filter out high-value transactions that require super admin
     const allowedTransactions = selectedTransactions.filter(id => {
       const transaction = transactions.find(t => t.id === id)
@@ -280,25 +282,33 @@ export default function Dashboard() {
 
     // Create promises for all allowed transactions
     const clearPromises = allowedTransactions.map(id => mockClearTransaction(id))
-
+    
     // Use Promise.allSettled to handle successes and failures independently
     const results = await Promise.allSettled(clearPromises)
-
-    // Process results
+    
+    // Process results - track successes and failures
     const successfulIds: string[] = []
+    const failedIds: string[] = []
+    
     results.forEach((result, index) => {
+      const transactionId = allowedTransactions[index]
       if (result.status === 'fulfilled' && result.value.success) {
-        successfulIds.push(allowedTransactions[index])
+        successfulIds.push(transactionId)
+      } else {
+        failedIds.push(transactionId)
       }
     })
 
-    // Update transaction statuses - only successful ones become Cleared
-    setTransactions(prev =>
-      prev.map(transaction =>
-        successfulIds.includes(transaction.id)
-          ? { ...transaction, status: 'Cleared' as const }
-          : transaction
-      )
+    // Update transaction statuses: successful → Cleared, failed → Failed
+    setTransactions(prev => 
+      prev.map(transaction => {
+        if (successfulIds.includes(transaction.id)) {
+          return { ...transaction, status: 'Cleared' as const }
+        } else if (failedIds.includes(transaction.id)) {
+          return { ...transaction, status: 'Failed' as const }
+        }
+        return transaction
+      })
     )
 
     // Clear selection and processing state
@@ -494,7 +504,7 @@ export default function Dashboard() {
         )}
 
         {/* Transaction Table */}
-        <div 
+        <div
           className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden animate-fade-in"
           style={{ animationDelay: '100ms' }}
           onMouseEnter={() => streamingMode === 'live' && setIsHovering(true)}
@@ -528,7 +538,7 @@ export default function Dashboard() {
                       checked={transactions.filter(t => t.status === 'Pending').length > 0 &&
                                transactions.filter(t => t.status === 'Pending').every(t => selectedIds.has(t.id))}
                       onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-yellow-400 focus:ring-yellow-400/50"
+                      className="custom-checkbox"
                     />
                   </th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
@@ -575,10 +585,10 @@ export default function Dashboard() {
                             type="checkbox"
                             checked={selectedIds.has(transaction.id)}
                             onChange={() => toggleSelection(transaction.id)}
-                            className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-yellow-400 focus:ring-yellow-400/50"
+                            className="custom-checkbox"
                           />
                         ) : (
-                          <div className="h-4 w-4"></div>
+                          <div className="h-[18px] w-[18px]"></div>
                         )}
                       </td>
                       <td className="px-4 py-3 text-[12px] font-mono font-medium text-gray-300 whitespace-nowrap">
