@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 
 interface Transaction {
   id: string
@@ -13,84 +13,209 @@ interface Transaction {
 // Generate mock transactions
 const generateMockTransactions = (): Transaction[] => {
   const names = [
-    'John Smith', 'Emily Johnson', 'Michael Brown', 'Sarah Davis', 'David Wilson',
-    'Lisa Anderson', 'Robert Taylor', 'Jennifer Moore', 'William Jackson', 'Mary White',
-    'James Martin', 'Patricia Garcia', 'Richard Rodriguez', 'Susan Lewis', 'Joseph Lee',
-    'Linda Walker', 'Thomas Hall', 'Barbara Allen', 'Christopher Young', 'Nancy King',
-    'Daniel Wright', 'Betty Lopez', 'Matthew Hill', 'Helen Scott', 'Anthony Green',
-    'Donna Adams', 'Mark Baker', 'Carol Gonzalez', 'Donald Nelson', 'Ruth Carter',
-    'Steven Mitchell', 'Sharon Perez', 'Paul Roberts', 'Michelle Turner', 'Andrew Phillips',
-    'Kimberly Campbell', 'Joshua Parker', 'Elizabeth Evans', 'Kenneth Edwards', 'Amy Collins',
-    'Kevin Stewart', 'Deborah Sanchez', 'Brian Morris', 'Angela Rogers', 'George Reed',
-    'Brenda Cook', 'Edward Morgan', 'Emma Bailey', 'Ronald Cooper', 'Olivia Richardson'
+    'Meridian Capital Partners', 'Lumen Digital Holdings', 'Atlas Fiduciary Group', 
+    'Redstone Treasury LLC', 'Vega Stablecoin Corp', 'Northbridge Settlement Co',
+    'Cascade Payments Inc', 'Ironclad Financial Services', 'Solaris Digital Assets',
+    'Whitmore & Jacobs LLP', 'Pinnacle Reserve Fund', 'Crescent Bay Ventures',
+    'Apex Clearing Solutions', 'BlueLine Custody Services', 'Tidewater Compliance Ltd',
+    'Granite Peak Holdings', 'Starboard Treasury Inc', 'Ember Financial Group',
+    'Harborview Capital', 'Keystone Digital Payments'
   ]
   
   const statuses: Transaction['status'][] = ['Pending', 'Cleared', 'Failed']
   
   return Array.from({ length: 50 }, (_, i) => ({
     id: `TXN-${String(i + 1).padStart(3, '0')}`,
-    clientName: names[i],
-    amount: Math.floor(Math.random() * 50000) + 1000, // $1K to $51K
+    clientName: names[Math.floor(Math.random() * names.length)],
+    amount: Math.floor(Math.random() * 2000000) + 500, // $500 to $2M
     status: statuses[Math.floor(Math.random() * statuses.length)],
     timestamp: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)).toISOString()
   }))
+}
+
+// Generate a single new transaction
+const generateNewTransaction = (counter: number): Transaction => {
+  const names = [
+    'Quantum Finance LLC', 'Digital Ledger Corp', 'Nexus Capital Group',
+    'Prism Asset Management', 'Velocity Trading Inc', 'Phoenix Investment Fund'
+  ]
+  
+  const statuses: Transaction['status'][] = ['Pending', 'Cleared', 'Failed']
+  
+  return {
+    id: `TXN-${String(counter).padStart(3, '0')}`,
+    clientName: names[Math.floor(Math.random() * names.length)],
+    amount: Math.floor(Math.random() * 1500000) + 1000,
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    timestamp: new Date().toISOString()
+  }
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function StatusBadge({ status }: { status: Transaction['status'] }) {
+  const config = {
+    Pending: {
+      bg: 'bg-accent-amber/10',
+      text: 'text-accent-amber',
+      dot: 'bg-accent-amber',
+      border: 'border-accent-amber/20',
+    },
+    Cleared: {
+      bg: 'bg-accent-green/10',
+      text: 'text-accent-green', 
+      dot: 'bg-accent-green',
+      border: 'border-accent-green/20',
+    },
+    Failed: {
+      bg: 'bg-accent-red/10',
+      text: 'text-accent-red',
+      dot: 'bg-accent-red',
+      border: 'border-accent-red/20',
+    },
+  }[status]
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase border ${config.bg} ${config.text} ${config.border}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+      {status}
+    </span>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string
+  value: string
+  sub?: string
+  accent?: string
+}) {
+  return (
+    <div className="bg-surface-1 border border-border-subtle rounded-lg px-5 py-4 flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-widest text-text-muted">
+        {label}
+      </span>
+      <span className={`text-2xl font-mono font-light tracking-tight ${accent || 'text-text-primary'}`}>
+        {value}
+      </span>
+      {sub && (
+        <span className="text-xs text-text-muted font-mono">{sub}</span>
+      )}
+    </div>
+  )
+}
+
+function Spinner() {
+  return (
+    <svg className="processing-spinner h-3 w-3" viewBox="0 0 12 12" fill="none">
+      <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="20 12" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
-  const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([])
-  const [transactionCounter, setTransactionCounter] = useState(51) // Start after initial 50
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkProcessing, setBulkProcessing] = useState(false)
+  const [transactionCounter, setTransactionCounter] = useState(51)
+  const [isHovering, setIsHovering] = useState(false)
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
   }, [])
 
-  // Generate a single new transaction
-  const generateNewTransaction = (): Transaction => {
-    const names = [
-      'Alex Chen', 'Jordan Williams', 'Taylor Brown', 'Casey Johnson', 'Morgan Davis',
-      'Jamie Wilson', 'Riley Anderson', 'Avery Taylor', 'Quinn Moore', 'Parker Jackson',
-      'Cameron White', 'Blake Harris', 'Sage Martin', 'River Thompson', 'Sky Garcia',
-      'Phoenix Rodriguez', 'Rowan Lewis', 'Dakota Lee', 'Storm Walker', 'Nova Hall'
-    ]
-    
-    const statuses: Transaction['status'][] = ['Pending', 'Cleared', 'Failed']
-    
-    return {
-      id: `TXN-${String(transactionCounter).padStart(3, '0')}`,
-      clientName: names[Math.floor(Math.random() * names.length)],
-      amount: Math.floor(Math.random() * 50000) + 1000,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      timestamp: new Date().toISOString()
-    }
-  }
-
-  // Add new transaction every 2 seconds
+  // Natural streaming - add new transaction every 2 seconds unless hovering
   useEffect(() => {
     const interval = setInterval(() => {
-      const newTransaction = generateNewTransaction()
-      setPendingTransactions(prev => [newTransaction, ...prev])
-      setTransactionCounter(prev => prev + 1)
+      if (!isHovering) {
+        const newTransaction = generateNewTransaction(transactionCounter)
+        setTransactions(prev => [newTransaction, ...prev])
+        setTransactionCounter(prev => prev + 1)
+      }
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [transactionCounter])
+  }, [transactionCounter, isHovering])
 
-  // Load pending transactions into main list
-  const loadPendingTransactions = () => {
-    setTransactions(prev => [...pendingTransactions, ...prev])
-    setPendingTransactions([])
-  }
+  const stats = useMemo(() => {
+    const pending = transactions.filter((t) => t.status === 'Pending')
+    const cleared = transactions.filter((t) => t.status === 'Cleared')
+    const failed = transactions.filter((t) => t.status === 'Failed')
+    const totalVolume = transactions.reduce((sum, t) => sum + t.amount, 0)
+    const pendingVolume = pending.reduce((sum, t) => sum + t.amount, 0)
+
+    return {
+      total: transactions.length,
+      pending: pending.length,
+      cleared: cleared.length,
+      failed: failed.length,
+      totalVolume,
+      pendingVolume,
+    }
+  }, [transactions])
 
   // Mock API call with 10% failure rate
   const mockClearTransaction = async (transactionId: string): Promise<{ id: string; success: boolean }> => {
-    await new Promise(resolve => setTimeout(resolve, 1500)) // 1.5s delay
+    await new Promise(resolve => setTimeout(resolve, 1500))
     const success = Math.random() > 0.1 // 90% success rate
     return { id: transactionId, success }
+  }
+
+  const clearFunds = async (transactionId: string) => {
+    const transaction = transactions.find(t => t.id === transactionId)
+    
+    if (transaction && transaction.amount > 10000 && !isSuperAdmin) {
+      return
+    }
+    
+    setProcessingIds(prev => new Set(prev).add(transactionId))
+    
+    const result = await mockClearTransaction(transactionId)
+    
+    if (result.success) {
+      setTransactions(prev => 
+        prev.map(transaction => 
+          transaction.id === transactionId 
+            ? { ...transaction, status: 'Cleared' }
+            : transaction
+        )
+      )
+    }
+    
+    setProcessingIds(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(transactionId)
+      return newSet
+    })
   }
 
   // Bulk clear selected transactions
@@ -160,261 +285,258 @@ export default function Dashboard() {
     }
   }
 
-  const clearFunds = async (transactionId: string) => {
-    const transaction = transactions.find(t => t.id === transactionId)
-    
-    // Check if high-value transaction and admin permission
-    if (transaction && transaction.amount > 10000 && !isSuperAdmin) {
-      return // Should not happen due to UI logic, but safety check
-    }
-    
-    setProcessingIds(prev => new Set(prev).add(transactionId))
-    
-    // Mock API call with 1.5s delay
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    setTransactions(prev => 
-      prev.map(transaction => 
-        transaction.id === transactionId 
-          ? { ...transaction, status: 'Cleared' }
-          : transaction
-      )
-    )
-    
-    setProcessingIds(prev => {
-      const newSet = new Set(prev)
-      newSet.delete(transactionId)
-      return newSet
-    })
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount)
-  }
-
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  const getStatusColor = (status: Transaction['status']) => {
-    switch (status) {
-      case 'Pending': return 'text-yellow-600 bg-yellow-50'
-      case 'Cleared': return 'text-green-600 bg-green-50'
-      case 'Failed': return 'text-red-600 bg-red-50'
-      default: return 'text-gray-600 bg-gray-50'
-    }
+  const rowBorderColor: Record<Transaction['status'], string> = {
+    Pending: 'border-l-accent-amber/40',
+    Cleared: 'border-l-accent-green/20',
+    Failed: 'border-l-accent-red/30',
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">
-                  Portola Ops Dashboard
-                </h1>
-                <p className="text-sm text-gray-600 mt-1">
-                  Settlement monitoring and fund clearing operations
-                </p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <label className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-gray-700">Super Admin</span>
-                  <button
-                    onClick={() => setIsSuperAdmin(!isSuperAdmin)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                      isSuperAdmin ? 'bg-blue-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        isSuperAdmin ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </label>
-                {isSuperAdmin && (
-                  <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    High-Value Clearing Enabled
-                  </span>
-                )}
-              </div>
+    <div className="min-h-screen bg-surface-0 font-sans">
+      {/* Header */}
+      <header className="border-b border-border-subtle bg-surface-1/60 backdrop-blur-sm sticky top-0 z-50">
+        <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-md bg-accent-amber/15 border border-accent-amber/25 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-accent-amber">
+                <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-[15px] font-semibold tracking-tight text-text-primary leading-none">
+                Portola
+              </h1>
+              <span className="text-[11px] text-text-muted tracking-wide">
+                Settlement Monitor
+              </span>
             </div>
           </div>
+          <div className="flex items-center gap-6">
+            {/* Super Admin Toggle */}
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-medium text-text-secondary">Super Admin</span>
+              <button
+                onClick={() => setIsSuperAdmin(!isSuperAdmin)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-surface-1 ${
+                  isSuperAdmin ? 'bg-accent-amber' : 'bg-surface-3'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3 w-3 transform rounded-full bg-surface-0 transition-transform ${
+                    isSuperAdmin ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              {isSuperAdmin && (
+                <span className="text-[10px] font-medium text-accent-amber bg-accent-amber/10 px-2 py-0.5 rounded border border-accent-amber/20">
+                  HIGH-VALUE ENABLED
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-[11px] font-mono text-text-muted">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-green animate-pulse" />
+                Live
+              </div>
+              <span className="text-[11px] font-mono text-text-muted">
+                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-          {/* New transactions banner */}
-          {pendingTransactions.length > 0 && (
-            <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">
-                      {pendingTransactions.length} new transaction{pendingTransactions.length !== 1 ? 's' : ''} available
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      Click to load into table and prevent row shifting
-                    </p>
-                  </div>
-                </div>
+      <main className="mx-auto max-w-[1400px] px-6 py-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 animate-fade-in">
+          <StatCard
+            label="Total Volume"
+            value={formatCurrency(stats.totalVolume)}
+            sub={`${stats.total} transactions`}
+          />
+          <StatCard
+            label="Pending"
+            value={String(stats.pending)}
+            sub={formatCurrency(stats.pendingVolume)}
+            accent="text-accent-amber"
+          />
+          <StatCard
+            label="Cleared"
+            value={String(stats.cleared)}
+            accent="text-accent-green"
+          />
+          <StatCard
+            label="Failed"
+            value={String(stats.failed)}
+            accent="text-accent-red"
+          />
+        </div>
+
+        {/* Bulk actions */}
+        {selectedIds.size > 0 && (
+          <div className="bg-surface-1 border border-border-subtle rounded-lg px-5 py-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-[13px] font-medium text-text-primary">
+                  {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''} selected
+                </span>
+              </div>
+              <div className="flex items-center space-x-3">
                 <button
-                  onClick={loadPendingTransactions}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-[12px] text-text-muted hover:text-text-secondary transition-colors"
                 >
-                  Load {pendingTransactions.length} Transaction{pendingTransactions.length !== 1 ? 's' : ''}
+                  Clear Selection
+                </button>
+                <button
+                  onClick={clearSelectedTransactions}
+                  disabled={bulkProcessing}
+                  className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-medium tracking-wide transition-all duration-200 bg-accent-green/15 text-accent-green border border-accent-green/25 hover:bg-accent-green/25 hover:border-accent-green/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {bulkProcessing ? (
+                    <>
+                      <Spinner />
+                      Processing...
+                    </>
+                  ) : (
+                    `Clear Selected (${selectedIds.size})`
+                  )}
                 </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Bulk actions */}
-          {selectedIds.size > 0 && (
-            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-700">
-                    {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''} selected
-                  </span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setSelectedIds(new Set())}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Clear Selection
-                  </button>
-                  <button
-                    onClick={clearSelectedTransactions}
-                    disabled={bulkProcessing}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {bulkProcessing ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Processing...
-                      </>
-                    ) : (
-                      `Clear Selected (${selectedIds.size})`
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          
+        {/* Transaction Table */}
+        <div 
+          className="bg-surface-1 border border-border-subtle rounded-lg overflow-hidden animate-fade-in"
+          style={{ animationDelay: '100ms' }}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+        >
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <span className="text-[12px] font-medium text-text-secondary tracking-wide uppercase">
+              Transaction Ledger
+            </span>
+            <span className="text-[11px] font-mono text-text-muted">
+              {stats.pending > 0 && (
+                <span className="text-accent-amber">{stats.pending} awaiting clearance</span>
+              )}
+            </span>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-5 py-2.5 text-left">
                     <input
                       type="checkbox"
                       checked={transactions.filter(t => t.status === 'Pending').length > 0 && 
                                transactions.filter(t => t.status === 'Pending').every(t => selectedIds.has(t.id))}
                       onChange={toggleSelectAll}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 rounded border-border bg-surface-2 text-accent-amber focus:ring-accent-amber/50"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Transaction ID
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    TXN ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client Name
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    Client
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Timestamp
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    Time
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                  <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                    Action
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {transactions.map((transaction) => {
+              <tbody>
+                {transactions.map((transaction, i) => {
                   const isHighValue = transaction.amount > 10000
                   const canClearFunds = transaction.status === 'Pending' && (!isHighValue || isSuperAdmin)
                   
                   return (
-                    <tr 
-                      key={transaction.id} 
-                      className={`${isHighValue ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}
+                    <tr
+                      key={transaction.id}
+                      className={`
+                        border-b border-border-subtle last:border-0
+                        border-l-2 ${rowBorderColor[transaction.status]}
+                        ${isHighValue ? 'bg-accent-red/5' : ''}
+                        hover:bg-surface-2/50 transition-colors duration-150
+                        animate-row-in
+                      `}
+                      style={{ animationDelay: `${i * 20}ms` }}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-5 py-3">
                         {transaction.status === 'Pending' ? (
                           <input
                             type="checkbox"
                             checked={selectedIds.has(transaction.id)}
                             onChange={() => toggleSelection(transaction.id)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-4 w-4 rounded border-border bg-surface-2 text-accent-amber focus:ring-accent-amber/50"
                           />
                         ) : (
                           <div className="h-4 w-4"></div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-4 py-3 text-[12px] font-mono font-medium text-text-secondary whitespace-nowrap">
                         {transaction.id}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 text-[13px] text-text-primary whitespace-nowrap">
                         {transaction.clientName}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className={isHighValue ? 'font-semibold text-red-700' : ''}>
+                      <td className="px-4 py-3 text-right text-[13px] font-mono font-light whitespace-nowrap tabular-nums">
+                        <span className={isHighValue ? 'font-semibold text-accent-red' : 'text-text-primary'}>
                           {formatCurrency(transaction.amount)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
-                          {transaction.status}
-                        </span>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <StatusBadge status={transaction.status} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatTimestamp(transaction.timestamp)}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="text-[12px] font-mono text-text-secondary">
+                            {formatTime(transaction.timestamp)}
+                          </span>
+                          <span className="text-[10px] font-mono text-text-muted">
+                            {formatDate(transaction.timestamp)}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-5 py-3 text-right whitespace-nowrap">
                         {transaction.status === 'Pending' && (
                           <button
                             onClick={() => clearFunds(transaction.id)}
                             disabled={processingIds.has(transaction.id) || !canClearFunds}
-                            className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                              canClearFunds
-                                ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                                : 'text-gray-500 bg-gray-200 cursor-not-allowed'
-                            }`}
+                            className={`
+                              inline-flex items-center gap-1.5 rounded-md px-3 py-1.5
+                              text-[11px] font-medium tracking-wide
+                              transition-all duration-200
+                              ${processingIds.has(transaction.id)
+                                ? 'bg-surface-3 text-text-muted border border-border cursor-not-allowed'
+                                : canClearFunds
+                                ? 'bg-accent-amber/15 text-accent-amber border border-accent-amber/25 hover:bg-accent-amber/25 hover:border-accent-amber/40 btn-clear-pulse cursor-pointer'
+                                : 'bg-surface-3 text-text-muted border border-border cursor-not-allowed'
+                              }
+                            `}
                           >
                             {processingIds.has(transaction.id) ? (
                               <>
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Processing...
+                                <Spinner />
+                                Processing
                               </>
                             ) : canClearFunds ? (
                               'Clear Funds'
                             ) : (
-                              'Requires Super Admin'
+                              'Super Admin Required'
                             )}
                           </button>
                         )}
@@ -426,7 +548,17 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
-      </div>
+
+        {/* Footer */}
+        <div className="mt-4 flex items-center justify-between px-1">
+          <span className="text-[10px] font-mono text-text-muted tracking-wide">
+            PORTOLA SETTLEMENTS v2.0
+          </span>
+          <span className="text-[10px] font-mono text-text-muted">
+            {stats.total} records • {isHovering ? 'paused' : 'streaming'}
+          </span>
+        </div>
+      </main>
     </div>
   )
 }
