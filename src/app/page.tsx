@@ -310,17 +310,14 @@ export default function Dashboard() {
       <header className="border-b border-gray-700 bg-gray-800/90 backdrop-blur-sm sticky top-0 z-50">
         <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-blue-400">
-                <path d="M8 2L2 8h12L8 2zM8 14L14 8H2l6 6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-[15px] font-semibold tracking-tight text-white leading-none">
-                Portola Ops
-              </h1>
+            <img 
+              src="/portola-logo.svg" 
+              alt="Portola" 
+              className="h-8 w-auto invert"
+            />
+            <div className="border-l border-gray-600 pl-3">
               <span className="text-[11px] text-gray-400 tracking-wide">
-                Transaction Dashboard
+                Settlement Monitor
               </span>
             </div>
           </div>
