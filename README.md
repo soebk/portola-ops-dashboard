@@ -25,12 +25,13 @@ Settlement monitoring dashboard built with Next.js + TypeScript + Tailwind CSS f
 - **Manual mode**: Streaming paused, users click "Refresh" when ready
 - **Flash animation** highlights new transactions as they appear
 
-### Phase 4 ✅ FINAL
-- Checkboxes for multi-select on Pending transactions
-- "Clear Selected" bulk action button
-- 10% random failure rate simulation
-- Promise.allSettled for resilient batch processing
-- Successful transactions → Cleared, failed → stay Pending
+### Phase 4 ✅ FINAL  
+- **Beautiful custom checkboxes** for multi-select on Pending transactions
+- "Clear Selected" bulk action button with type-to-confirm safety
+- **10% random failure rate** on BOTH individual AND bulk operations  
+- **Promise.allSettled** for resilient concurrent batch processing
+- **Smart status handling**: Successful → Cleared, Failed → Failed (not Pending)
+- **Independent processing**: Each transaction result handled separately
 
 ### Bonus Features ✅
 - **Safety Confirmation**: Must type "clear" before bulk operations
@@ -39,12 +40,14 @@ Settlement monitoring dashboard built with Next.js + TypeScript + Tailwind CSS f
 
 ## Technical Highlights
 
+- **Beautiful Custom Checkboxes**: Professional blue-checked styling with smooth animations
 - **Dual Streaming Modes**: Live auto-streaming vs Manual refresh with user choice
 - **Professional Settings Panel**: Radio button interface for mode selection
 - **Smart Pause Controls**: Hover-to-pause + manual pause/resume in Live mode
 - **Safety Confirmations**: Type-to-confirm for destructive bulk operations
+- **Enhanced Error Handling**: 10% failure rate on individual + bulk operations
+- **Resilient Processing**: Promise.allSettled with proper Failed status handling
 - **Working Super Admin Toggle**: Functional high-value transaction controls
-- **Robust Error Handling**: Uses Promise.allSettled for independent transaction processing  
 - **Advanced Animations**: Flash effects for new transactions, smooth transitions
 - **Production-Ready**: Clean TypeScript, responsive design, proper accessibility
 
