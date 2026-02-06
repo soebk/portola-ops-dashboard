@@ -343,7 +343,7 @@ export default function Dashboard() {
               </button>
               {isSuperAdmin && (
                 <span className="text-xs font-medium text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">
-                  HIGH-VALUE UNLOCKED
+                  ELEVATED
                 </span>
               )}
             </div>
