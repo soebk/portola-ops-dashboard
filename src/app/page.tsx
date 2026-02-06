@@ -42,6 +42,8 @@ export default function Dashboard() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([])
   const [transactionCounter, setTransactionCounter] = useState(51) // Start after initial 50
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkProcessing, setBulkProcessing] = useState(false)
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
@@ -82,6 +84,80 @@ export default function Dashboard() {
   const loadPendingTransactions = () => {
     setTransactions(prev => [...pendingTransactions, ...prev])
     setPendingTransactions([])
+  }
+
+  // Mock API call with 10% failure rate
+  const mockClearTransaction = async (transactionId: string): Promise<{ id: string; success: boolean }> => {
+    await new Promise(resolve => setTimeout(resolve, 1500)) // 1.5s delay
+    const success = Math.random() > 0.1 // 90% success rate
+    return { id: transactionId, success }
+  }
+
+  // Bulk clear selected transactions
+  const clearSelectedTransactions = async () => {
+    if (selectedIds.size === 0) return
+
+    setBulkProcessing(true)
+    const selectedTransactions = Array.from(selectedIds)
+    
+    // Filter out high-value transactions that require super admin
+    const allowedTransactions = selectedTransactions.filter(id => {
+      const transaction = transactions.find(t => t.id === id)
+      return transaction && (transaction.amount <= 10000 || isSuperAdmin)
+    })
+
+    // Create promises for all allowed transactions
+    const clearPromises = allowedTransactions.map(id => mockClearTransaction(id))
+    
+    // Use Promise.allSettled to handle successes and failures independently
+    const results = await Promise.allSettled(clearPromises)
+    
+    // Process results
+    const successfulIds: string[] = []
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value.success) {
+        successfulIds.push(allowedTransactions[index])
+      }
+    })
+
+    // Update transaction statuses - only successful ones become Cleared
+    setTransactions(prev => 
+      prev.map(transaction => 
+        successfulIds.includes(transaction.id)
+          ? { ...transaction, status: 'Cleared' as const }
+          : transaction
+      )
+    )
+
+    // Clear selection and processing state
+    setSelectedIds(new Set())
+    setBulkProcessing(false)
+  }
+
+  // Toggle transaction selection
+  const toggleSelection = (transactionId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(transactionId)) {
+        newSet.delete(transactionId)
+      } else {
+        newSet.add(transactionId)
+      }
+      return newSet
+    })
+  }
+
+  // Select/deselect all pending transactions
+  const toggleSelectAll = () => {
+    const pendingTransactionIds = transactions
+      .filter(t => t.status === 'Pending')
+      .map(t => t.id)
+    
+    if (selectedIds.size === pendingTransactionIds.length) {
+      setSelectedIds(new Set()) // Deselect all
+    } else {
+      setSelectedIds(new Set(pendingTransactionIds)) // Select all pending
+    }
   }
 
   const clearFunds = async (transactionId: string) => {
@@ -203,11 +279,58 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* Bulk actions */}
+          {selectedIds.size > 0 && (
+            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-700">
+                    {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    onClick={clearSelectedTransactions}
+                    disabled={bulkProcessing}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {bulkProcessing ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      `Clear Selected (${selectedIds.size})`
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={transactions.filter(t => t.status === 'Pending').length > 0 && 
+                               transactions.filter(t => t.status === 'Pending').every(t => selectedIds.has(t.id))}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Transaction ID
                   </th>
@@ -238,6 +361,18 @@ export default function Dashboard() {
                       key={transaction.id} 
                       className={`${isHighValue ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}
                     >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {transaction.status === 'Pending' ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(transaction.id)}
+                            onChange={() => toggleSelection(transaction.id)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        ) : (
+                          <div className="h-4 w-4"></div>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {transaction.id}
                       </td>
