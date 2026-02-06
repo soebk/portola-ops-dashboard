@@ -13,7 +13,7 @@ interface Transaction {
 // Generate mock transactions
 const generateMockTransactions = (): Transaction[] => {
   const names = [
-    'Meridian Capital Partners', 'Lumen Digital Holdings', 'Atlas Fiduciary Group', 
+    'Meridian Capital Partners', 'Lumen Digital Holdings', 'Atlas Fiduciary Group',
     'Redstone Treasury LLC', 'Vega Stablecoin Corp', 'Northbridge Settlement Co',
     'Cascade Payments Inc', 'Ironclad Financial Services', 'Solaris Digital Assets',
     'Whitmore & Jacobs LLP', 'Pinnacle Reserve Fund', 'Crescent Bay Ventures',
@@ -21,9 +21,9 @@ const generateMockTransactions = (): Transaction[] => {
     'Granite Peak Holdings', 'Starboard Treasury Inc', 'Ember Financial Group',
     'Harborview Capital', 'Keystone Digital Payments'
   ]
-  
+
   const statuses: Transaction['status'][] = ['Pending', 'Cleared', 'Failed']
-  
+
   return Array.from({ length: 50 }, (_, i) => ({
     id: `TXN-${String(i + 1).padStart(3, '0')}`,
     clientName: names[Math.floor(Math.random() * names.length)],
@@ -39,9 +39,9 @@ const generateNewTransaction = (counter: number): Transaction => {
     'Quantum Finance LLC', 'Digital Ledger Corp', 'Nexus Capital Group',
     'Prism Asset Management', 'Velocity Trading Inc', 'Phoenix Investment Fund'
   ]
-  
+
   const statuses: Transaction['status'][] = ['Pending', 'Cleared', 'Failed']
-  
+
   return {
     id: `TXN-${String(counter).padStart(3, '0')}`,
     clientName: names[Math.floor(Math.random() * names.length)],
@@ -79,22 +79,22 @@ function formatDate(iso: string): string {
 function StatusBadge({ status }: { status: Transaction['status'] }) {
   const config = {
     Pending: {
-      bg: 'bg-accent-amber/10',
-      text: 'text-accent-amber',
-      dot: 'bg-accent-amber',
-      border: 'border-accent-amber/20',
+      bg: 'bg-yellow-500/10',
+      text: 'text-yellow-400',
+      dot: 'bg-yellow-400',
+      border: 'border-yellow-500/20',
     },
     Cleared: {
-      bg: 'bg-accent-green/10',
-      text: 'text-accent-green', 
-      dot: 'bg-accent-green',
-      border: 'border-accent-green/20',
+      bg: 'bg-green-500/10',
+      text: 'text-green-400',
+      dot: 'bg-green-400',
+      border: 'border-green-500/20',
     },
     Failed: {
-      bg: 'bg-accent-red/10',
-      text: 'text-accent-red',
-      dot: 'bg-accent-red',
-      border: 'border-accent-red/20',
+      bg: 'bg-red-500/10',
+      text: 'text-red-400',
+      dot: 'bg-red-400',
+      border: 'border-red-500/20',
     },
   }[status]
 
@@ -118,15 +118,15 @@ function StatCard({
   accent?: string
 }) {
   return (
-    <div className="bg-surface-1 border border-border-subtle rounded-lg px-5 py-4 flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-widest text-text-muted">
+    <div className="bg-gray-800 border border-gray-700 rounded-lg px-5 py-4 flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-widest text-gray-400">
         {label}
       </span>
-      <span className={`text-2xl font-mono font-light tracking-tight ${accent || 'text-text-primary'}`}>
+      <span className={`text-2xl font-mono font-light tracking-tight ${accent || 'text-white'}`}>
         {value}
       </span>
       {sub && (
-        <span className="text-xs text-text-muted font-mono">{sub}</span>
+        <span className="text-xs text-gray-400 font-mono">{sub}</span>
       )}
     </div>
   )
@@ -148,6 +148,7 @@ export default function Dashboard() {
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [transactionCounter, setTransactionCounter] = useState(51)
   const [isHovering, setIsHovering] = useState(false)
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
@@ -160,6 +161,18 @@ export default function Dashboard() {
         const newTransaction = generateNewTransaction(transactionCounter)
         setTransactions(prev => [newTransaction, ...prev])
         setTransactionCounter(prev => prev + 1)
+
+        // Mark as newly added for flash effect
+        setNewlyAddedIds(prev => new Set(prev).add(newTransaction.id))
+
+        // Remove flash after 2 seconds
+        setTimeout(() => {
+          setNewlyAddedIds(prev => {
+            const updated = new Set(prev)
+            updated.delete(newTransaction.id)
+            return updated
+          })
+        }, 2000)
       }
     }, 2000)
 
@@ -192,25 +205,25 @@ export default function Dashboard() {
 
   const clearFunds = async (transactionId: string) => {
     const transaction = transactions.find(t => t.id === transactionId)
-    
+
     if (transaction && transaction.amount > 10000 && !isSuperAdmin) {
       return
     }
-    
+
     setProcessingIds(prev => new Set(prev).add(transactionId))
-    
+
     const result = await mockClearTransaction(transactionId)
-    
+
     if (result.success) {
-      setTransactions(prev => 
-        prev.map(transaction => 
-          transaction.id === transactionId 
+      setTransactions(prev =>
+        prev.map(transaction =>
+          transaction.id === transactionId
             ? { ...transaction, status: 'Cleared' }
             : transaction
         )
       )
     }
-    
+
     setProcessingIds(prev => {
       const newSet = new Set(prev)
       newSet.delete(transactionId)
@@ -224,7 +237,7 @@ export default function Dashboard() {
 
     setBulkProcessing(true)
     const selectedTransactions = Array.from(selectedIds)
-    
+
     // Filter out high-value transactions that require super admin
     const allowedTransactions = selectedTransactions.filter(id => {
       const transaction = transactions.find(t => t.id === id)
@@ -233,10 +246,10 @@ export default function Dashboard() {
 
     // Create promises for all allowed transactions
     const clearPromises = allowedTransactions.map(id => mockClearTransaction(id))
-    
+
     // Use Promise.allSettled to handle successes and failures independently
     const results = await Promise.allSettled(clearPromises)
-    
+
     // Process results
     const successfulIds: string[] = []
     results.forEach((result, index) => {
@@ -246,8 +259,8 @@ export default function Dashboard() {
     })
 
     // Update transaction statuses - only successful ones become Cleared
-    setTransactions(prev => 
-      prev.map(transaction => 
+    setTransactions(prev =>
+      prev.map(transaction =>
         successfulIds.includes(transaction.id)
           ? { ...transaction, status: 'Cleared' as const }
           : transaction
@@ -277,7 +290,7 @@ export default function Dashboard() {
     const pendingTransactionIds = transactions
       .filter(t => t.status === 'Pending')
       .map(t => t.id)
-    
+
     if (selectedIds.size === pendingTransactionIds.length) {
       setSelectedIds(new Set()) // Deselect all
     } else {
@@ -286,59 +299,60 @@ export default function Dashboard() {
   }
 
   const rowBorderColor: Record<Transaction['status'], string> = {
-    Pending: 'border-l-accent-amber/40',
-    Cleared: 'border-l-accent-green/20',
-    Failed: 'border-l-accent-red/30',
+    Pending: 'border-l-yellow-400/40',
+    Cleared: 'border-l-green-400/40',
+    Failed: 'border-l-red-400/40',
   }
 
   return (
-    <div className="min-h-screen bg-surface-0 font-sans">
+    <div className="min-h-screen bg-gray-900 font-sans">
       {/* Header */}
-      <header className="border-b border-border-subtle bg-surface-1/60 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-gray-700 bg-gray-800/90 backdrop-blur-sm sticky top-0 z-50">
         <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-accent-amber/15 border border-accent-amber/25 flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-accent-amber">
-                <path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <div className="h-8 w-8 rounded-md bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-blue-400">
+                <path d="M8 2L2 8h12L8 2zM8 14L14 8H2l6 6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <div>
-              <h1 className="text-[15px] font-semibold tracking-tight text-text-primary leading-none">
-                Portola
+              <h1 className="text-[15px] font-semibold tracking-tight text-white leading-none">
+                Portola Ops
               </h1>
-              <span className="text-[11px] text-text-muted tracking-wide">
-                Settlement Monitor
+              <span className="text-[11px] text-gray-400 tracking-wide">
+                Transaction Dashboard
               </span>
             </div>
           </div>
           <div className="flex items-center gap-6">
             {/* Super Admin Toggle */}
             <div className="flex items-center gap-3">
-              <span className="text-[11px] font-medium text-text-secondary">Super Admin</span>
+              <span className="text-sm font-medium text-gray-200">Super Admin</span>
               <button
                 onClick={() => setIsSuperAdmin(!isSuperAdmin)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-surface-1 ${
-                  isSuperAdmin ? 'bg-accent-amber' : 'bg-surface-3'
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
+                  isSuperAdmin ? 'bg-blue-500' : 'bg-gray-600'
                 }`}
+                type="button"
               >
                 <span
-                  className={`inline-block h-3 w-3 transform rounded-full bg-surface-0 transition-transform ${
-                    isSuperAdmin ? 'translate-x-5' : 'translate-x-1'
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                    isSuperAdmin ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
               {isSuperAdmin && (
-                <span className="text-[10px] font-medium text-accent-amber bg-accent-amber/10 px-2 py-0.5 rounded border border-accent-amber/20">
-                  HIGH-VALUE ENABLED
+                <span className="text-xs font-medium text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">
+                  HIGH-VALUE UNLOCKED
                 </span>
               )}
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-[11px] font-mono text-text-muted">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent-green animate-pulse" />
+              <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
                 Live
               </div>
-              <span className="text-[11px] font-mono text-text-muted">
+              <span className="text-[11px] font-mono text-gray-400">
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
             </div>
@@ -358,40 +372,40 @@ export default function Dashboard() {
             label="Pending"
             value={String(stats.pending)}
             sub={formatCurrency(stats.pendingVolume)}
-            accent="text-accent-amber"
+            accent="text-yellow-400"
           />
           <StatCard
             label="Cleared"
             value={String(stats.cleared)}
-            accent="text-accent-green"
+            accent="text-green-400"
           />
           <StatCard
             label="Failed"
             value={String(stats.failed)}
-            accent="text-accent-red"
+            accent="text-red-400"
           />
         </div>
 
         {/* Bulk actions */}
         {selectedIds.size > 0 && (
-          <div className="bg-surface-1 border border-border-subtle rounded-lg px-5 py-3 mb-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg px-5 py-3 mb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <span className="text-[13px] font-medium text-text-primary">
+                <span className="text-[13px] font-medium text-white">
                   {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''} selected
                 </span>
               </div>
               <div className="flex items-center space-x-3">
                 <button
                   onClick={() => setSelectedIds(new Set())}
-                  className="text-[12px] text-text-muted hover:text-text-secondary transition-colors"
+                  className="text-[12px] text-gray-400 hover:text-gray-300 transition-colors"
                 >
                   Clear Selection
                 </button>
                 <button
                   onClick={clearSelectedTransactions}
                   disabled={bulkProcessing}
-                  className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-medium tracking-wide transition-all duration-200 bg-accent-green/15 text-accent-green border border-accent-green/25 hover:bg-accent-green/25 hover:border-accent-green/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[11px] font-medium tracking-wide transition-all duration-200 bg-green-500/15 text-green-400 border border-green-500/25 hover:bg-green-500/25 hover:border-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {bulkProcessing ? (
                     <>
@@ -408,19 +422,19 @@ export default function Dashboard() {
         )}
 
         {/* Transaction Table */}
-        <div 
-          className="bg-surface-1 border border-border-subtle rounded-lg overflow-hidden animate-fade-in"
+        <div
+          className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden animate-fade-in"
           style={{ animationDelay: '100ms' }}
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
-          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-            <span className="text-[12px] font-medium text-text-secondary tracking-wide uppercase">
+          <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
+            <span className="text-[12px] font-medium text-gray-300 tracking-wide uppercase">
               Transaction Ledger
             </span>
-            <span className="text-[11px] font-mono text-text-muted">
+            <span className="text-[11px] font-mono text-gray-400">
               {stats.pending > 0 && (
-                <span className="text-accent-amber">{stats.pending} awaiting clearance</span>
+                <span className="text-yellow-400">{stats.pending} awaiting clearance</span>
               )}
             </span>
           </div>
@@ -428,32 +442,32 @@ export default function Dashboard() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-b border-gray-700">
                   <th className="px-5 py-2.5 text-left">
                     <input
                       type="checkbox"
                       checked={transactions.filter(t => t.status === 'Pending').length > 0 && 
                                transactions.filter(t => t.status === 'Pending').every(t => selectedIds.has(t.id))}
                       onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-border bg-surface-2 text-accent-amber focus:ring-accent-amber/50"
+                      className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-yellow-400 focus:ring-yellow-400/50"
                     />
                   </th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
                     TXN ID
                   </th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
                     Client
                   </th>
-                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
                     Amount
                   </th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
                     Status
                   </th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
                     Time
                   </th>
-                  <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                  <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">
                     Action
                   </th>
                 </tr>
@@ -462,15 +476,16 @@ export default function Dashboard() {
                 {transactions.map((transaction, i) => {
                   const isHighValue = transaction.amount > 10000
                   const canClearFunds = transaction.status === 'Pending' && (!isHighValue || isSuperAdmin)
-                  
+
                   return (
                     <tr
                       key={transaction.id}
                       className={`
-                        border-b border-border-subtle last:border-0
+                        border-b border-gray-700 last:border-0
                         border-l-2 ${rowBorderColor[transaction.status]}
-                        ${isHighValue ? 'bg-accent-red/5' : ''}
-                        hover:bg-surface-2/50 transition-colors duration-150
+                        ${isHighValue ? 'bg-red-900/20' : ''}
+                        ${newlyAddedIds.has(transaction.id) ? 'animate-flash-new' : ''}
+                        hover:bg-gray-800/50 transition-colors duration-150
                         animate-row-in
                       `}
                       style={{ animationDelay: `${i * 20}ms` }}
@@ -481,20 +496,20 @@ export default function Dashboard() {
                             type="checkbox"
                             checked={selectedIds.has(transaction.id)}
                             onChange={() => toggleSelection(transaction.id)}
-                            className="h-4 w-4 rounded border-border bg-surface-2 text-accent-amber focus:ring-accent-amber/50"
+                            className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-yellow-400 focus:ring-yellow-400/50"
                           />
                         ) : (
                           <div className="h-4 w-4"></div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-[12px] font-mono font-medium text-text-secondary whitespace-nowrap">
+                      <td className="px-4 py-3 text-[12px] font-mono font-medium text-gray-300 whitespace-nowrap">
                         {transaction.id}
                       </td>
-                      <td className="px-4 py-3 text-[13px] text-text-primary whitespace-nowrap">
+                      <td className="px-4 py-3 text-[13px] text-white whitespace-nowrap">
                         {transaction.clientName}
                       </td>
                       <td className="px-4 py-3 text-right text-[13px] font-mono font-light whitespace-nowrap tabular-nums">
-                        <span className={isHighValue ? 'font-semibold text-accent-red' : 'text-text-primary'}>
+                        <span className={isHighValue ? 'font-semibold text-red-400' : 'text-white'}>
                           {formatCurrency(transaction.amount)}
                         </span>
                       </td>
@@ -503,10 +518,10 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span className="text-[12px] font-mono text-text-secondary">
+                          <span className="text-[12px] font-mono text-gray-300">
                             {formatTime(transaction.timestamp)}
                           </span>
-                          <span className="text-[10px] font-mono text-text-muted">
+                          <span className="text-[10px] font-mono text-gray-400">
                             {formatDate(transaction.timestamp)}
                           </span>
                         </div>
@@ -521,10 +536,10 @@ export default function Dashboard() {
                               text-[11px] font-medium tracking-wide
                               transition-all duration-200
                               ${processingIds.has(transaction.id)
-                                ? 'bg-surface-3 text-text-muted border border-border cursor-not-allowed'
+                                ? 'bg-gray-600 text-gray-400 border border-gray-600 cursor-not-allowed'
                                 : canClearFunds
-                                ? 'bg-accent-amber/15 text-accent-amber border border-accent-amber/25 hover:bg-accent-amber/25 hover:border-accent-amber/40 btn-clear-pulse cursor-pointer'
-                                : 'bg-surface-3 text-text-muted border border-border cursor-not-allowed'
+                                ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25 hover:bg-yellow-500/25 hover:border-yellow-500/40 btn-clear-pulse cursor-pointer'
+                                : 'bg-gray-600 text-gray-400 border border-gray-600 cursor-not-allowed'
                               }
                             `}
                           >
@@ -551,11 +566,11 @@ export default function Dashboard() {
 
         {/* Footer */}
         <div className="mt-4 flex items-center justify-between px-1">
-          <span className="text-[10px] font-mono text-text-muted tracking-wide">
-            PORTOLA SETTLEMENTS v2.0
+          <span className="text-[10px] font-mono text-gray-400 tracking-wide">
+            PORTOLA OPS DASHBOARD v2.0
           </span>
-          <span className="text-[10px] font-mono text-text-muted">
-            {stats.total} records • {isHovering ? 'paused' : 'streaming'}
+          <span className="text-[10px] font-mono text-gray-400">
+            {stats.total} records • <span className={isHovering ? 'text-yellow-400' : 'text-green-400'}>{isHovering ? 'paused' : 'streaming'}</span>
           </span>
         </div>
       </main>
