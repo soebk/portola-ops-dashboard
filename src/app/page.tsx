@@ -315,7 +315,7 @@ export default function Dashboard() {
               alt="Portola" 
               className="h-8 w-auto invert"
             />
-            <div className="border-l border-gray-600 pl-3">
+            <div className="border-l border-gray-600 pl-3 flex items-center">
               <span className="text-[11px] text-gray-400 tracking-wide">
                 Settlement Monitor
               </span>
