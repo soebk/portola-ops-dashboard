@@ -149,6 +149,8 @@ export default function Dashboard() {
   const [transactionCounter, setTransactionCounter] = useState(51)
   const [isHovering, setIsHovering] = useState(false)
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set())
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
@@ -231,13 +233,21 @@ export default function Dashboard() {
     })
   }
 
-  // Bulk clear selected transactions
-  const clearSelectedTransactions = async () => {
+  // Show confirmation modal for bulk clear
+  const clearSelectedTransactions = () => {
     if (selectedIds.size === 0) return
+    setShowConfirmModal(true)
+    setConfirmText('')
+  }
 
+  // Actually perform the bulk clear after confirmation
+  const performBulkClear = async () => {
     setBulkProcessing(true)
+    setShowConfirmModal(false)
+    setConfirmText('')
+    
     const selectedTransactions = Array.from(selectedIds)
-
+    
     // Filter out high-value transactions that require super admin
     const allowedTransactions = selectedTransactions.filter(id => {
       const transaction = transactions.find(t => t.id === id)
@@ -246,10 +256,10 @@ export default function Dashboard() {
 
     // Create promises for all allowed transactions
     const clearPromises = allowedTransactions.map(id => mockClearTransaction(id))
-
+    
     // Use Promise.allSettled to handle successes and failures independently
     const results = await Promise.allSettled(clearPromises)
-
+    
     // Process results
     const successfulIds: string[] = []
     results.forEach((result, index) => {
@@ -259,8 +269,8 @@ export default function Dashboard() {
     })
 
     // Update transaction statuses - only successful ones become Cleared
-    setTransactions(prev =>
-      prev.map(transaction =>
+    setTransactions(prev => 
+      prev.map(transaction => 
         successfulIds.includes(transaction.id)
           ? { ...transaction, status: 'Cleared' as const }
           : transaction
@@ -310,9 +320,9 @@ export default function Dashboard() {
       <header className="border-b border-gray-700 bg-gray-800/90 backdrop-blur-sm sticky top-0 z-50">
         <div className="mx-auto max-w-[1400px] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img 
-              src="/portola-logo.svg" 
-              alt="Portola" 
+            <img
+              src="/portola-logo.svg"
+              alt="Portola"
               className="h-8 w-auto invert"
             />
             <div className="border-l border-gray-600 pl-3 flex items-center">
@@ -443,7 +453,7 @@ export default function Dashboard() {
                   <th className="px-5 py-2.5 text-left">
                     <input
                       type="checkbox"
-                      checked={transactions.filter(t => t.status === 'Pending').length > 0 && 
+                      checked={transactions.filter(t => t.status === 'Pending').length > 0 &&
                                transactions.filter(t => t.status === 'Pending').every(t => selectedIds.has(t.id))}
                       onChange={toggleSelectAll}
                       className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-yellow-400 focus:ring-yellow-400/50"
@@ -571,6 +581,67 @@ export default function Dashboard() {
           </span>
         </div>
       </main>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowConfirmModal(false)}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white mb-2">
+                Confirm Bulk Clear
+              </h3>
+              <p className="text-gray-300 text-sm">
+                You are about to clear {selectedIds.size} selected transaction{selectedIds.size !== 1 ? 's' : ''}. 
+                This action cannot be undone.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Type <span className="font-mono bg-gray-700 px-1 rounded">clear</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && confirmText.toLowerCase() === 'clear') {
+                    performBulkClear()
+                  } else if (e.key === 'Escape') {
+                    setShowConfirmModal(false)
+                  }
+                }}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Type 'clear' to confirm"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performBulkClear}
+                disabled={confirmText.toLowerCase() !== 'clear'}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+              >
+                Clear {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
