@@ -151,15 +151,20 @@ export default function Dashboard() {
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set())
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmText, setConfirmText] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
+  const [streamingMode, setStreamingMode] = useState<'live' | 'manual'>('live')
+  const [isPaused, setIsPaused] = useState(false)
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
   }, [])
 
-  // Natural streaming - add new transaction every 2 seconds unless hovering
+  // Natural streaming - add new transaction every 2 seconds unless hovering or in manual mode
   useEffect(() => {
+    if (streamingMode === 'manual') return
+
     const interval = setInterval(() => {
-      if (!isHovering) {
+      if (!isHovering && !isPaused) {
         const newTransaction = generateNewTransaction(transactionCounter)
         setTransactions(prev => [newTransaction, ...prev])
         setTransactionCounter(prev => prev + 1)
@@ -179,7 +184,26 @@ export default function Dashboard() {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [transactionCounter, isHovering])
+  }, [transactionCounter, isHovering, isPaused, streamingMode])
+
+  // Manual refresh function
+  const refreshTransactions = () => {
+    const newTransaction = generateNewTransaction(transactionCounter)
+    setTransactions(prev => [newTransaction, ...prev])
+    setTransactionCounter(prev => prev + 1)
+
+    // Mark as newly added for flash effect
+    setNewlyAddedIds(prev => new Set(prev).add(newTransaction.id))
+
+    // Remove flash after 2 seconds
+    setTimeout(() => {
+      setNewlyAddedIds(prev => {
+        const updated = new Set(prev)
+        updated.delete(newTransaction.id)
+        return updated
+      })
+    }, 2000)
+  }
 
   const stats = useMemo(() => {
     const pending = transactions.filter((t) => t.status === 'Pending')
@@ -245,9 +269,9 @@ export default function Dashboard() {
     setBulkProcessing(true)
     setShowConfirmModal(false)
     setConfirmText('')
-    
+
     const selectedTransactions = Array.from(selectedIds)
-    
+
     // Filter out high-value transactions that require super admin
     const allowedTransactions = selectedTransactions.filter(id => {
       const transaction = transactions.find(t => t.id === id)
@@ -256,10 +280,10 @@ export default function Dashboard() {
 
     // Create promises for all allowed transactions
     const clearPromises = allowedTransactions.map(id => mockClearTransaction(id))
-    
+
     // Use Promise.allSettled to handle successes and failures independently
     const results = await Promise.allSettled(clearPromises)
-    
+
     // Process results
     const successfulIds: string[] = []
     results.forEach((result, index) => {
@@ -269,8 +293,8 @@ export default function Dashboard() {
     })
 
     // Update transaction statuses - only successful ones become Cleared
-    setTransactions(prev => 
-      prev.map(transaction => 
+    setTransactions(prev =>
+      prev.map(transaction =>
         successfulIds.includes(transaction.id)
           ? { ...transaction, status: 'Cleared' as const }
           : transaction
@@ -355,10 +379,51 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex items-center gap-4">
+              {/* Streaming Status */}
               <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                Live
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  streamingMode === 'live'
+                    ? (isHovering || isPaused ? 'bg-yellow-400' : 'bg-green-400 animate-pulse')
+                    : 'bg-gray-500'
+                }`} />
+                {streamingMode === 'live'
+                  ? (isHovering || isPaused ? 'Paused' : 'Live')
+                  : 'Manual'
+                }
               </div>
+
+              {/* Manual mode refresh button */}
+              {streamingMode === 'manual' && (
+                <button
+                  onClick={refreshTransactions}
+                  className="text-[11px] font-mono text-gray-400 hover:text-white transition-colors px-2 py-1 rounded border border-gray-600 hover:border-gray-500"
+                >
+                  Refresh
+                </button>
+              )}
+
+              {/* Live mode pause/resume */}
+              {streamingMode === 'live' && (
+                <button
+                  onClick={() => setIsPaused(!isPaused)}
+                  className="text-[11px] font-mono text-gray-400 hover:text-white transition-colors px-2 py-1 rounded border border-gray-600 hover:border-gray-500"
+                >
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+              )}
+
+              {/* Settings button */}
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="text-[11px] font-mono text-gray-400 hover:text-white transition-colors p-1 rounded"
+                title="Settings"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                </svg>
+              </button>
+
               <span className="text-[11px] font-mono text-gray-400">
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
@@ -429,21 +494,28 @@ export default function Dashboard() {
         )}
 
         {/* Transaction Table */}
-        <div
+        <div 
           className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden animate-fade-in"
           style={{ animationDelay: '100ms' }}
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
+          onMouseEnter={() => streamingMode === 'live' && setIsHovering(true)}
+          onMouseLeave={() => streamingMode === 'live' && setIsHovering(false)}
         >
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <span className="text-[12px] font-medium text-gray-300 tracking-wide uppercase">
               Transaction Ledger
             </span>
-            <span className="text-[11px] font-mono text-gray-400">
+            <div className="flex items-center gap-4">
               {stats.pending > 0 && (
-                <span className="text-yellow-400">{stats.pending} awaiting clearance</span>
+                <span className="text-[11px] font-mono text-yellow-400">
+                  {stats.pending} awaiting clearance
+                </span>
               )}
-            </span>
+              {streamingMode === 'live' && isHovering && (
+                <span className="text-[10px] font-mono text-yellow-400">
+                  Hover paused • Move mouse away to resume
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -577,20 +649,128 @@ export default function Dashboard() {
             PORTOLA OPS DASHBOARD v2.0
           </span>
           <span className="text-[10px] font-mono text-gray-400">
-            {stats.total} records • <span className={isHovering ? 'text-yellow-400' : 'text-green-400'}>{isHovering ? 'paused' : 'streaming'}</span>
+            {stats.total} records • <span className={
+              streamingMode === 'live'
+                ? (isHovering || isPaused ? 'text-yellow-400' : 'text-green-400')
+                : 'text-gray-400'
+            }>
+              {streamingMode === 'live'
+                ? (isHovering ? 'hover pause' : isPaused ? 'paused' : 'streaming')
+                : 'manual mode'
+              }
+            </span>
           </span>
         </div>
       </main>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSettings(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white mb-2">
+                Streaming Settings
+              </h3>
+              <p className="text-gray-300 text-sm">
+                Choose how transaction updates are handled.
+              </p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              {/* Live Streaming Mode */}
+              <div
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  streamingMode === 'live'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-600 hover:border-gray-500'
+                }`}
+                onClick={() => {
+                  setStreamingMode('live')
+                  setIsPaused(false)
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 mt-0.5 ${
+                    streamingMode === 'live'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-400'
+                  }`}>
+                    {streamingMode === 'live' && (
+                      <div className="w-2 h-2 bg-white rounded-full m-0.5" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-white font-medium mb-1">Live Streaming</h4>
+                    <p className="text-gray-400 text-sm">
+                      New transactions appear automatically every 2 seconds.
+                      Hover over the table to pause streaming temporarily.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual Mode */}
+              <div
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  streamingMode === 'manual'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-600 hover:border-gray-500'
+                }`}
+                onClick={() => {
+                  setStreamingMode('manual')
+                  setIsHovering(false)
+                  setIsPaused(false)
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 mt-0.5 ${
+                    streamingMode === 'manual'
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-gray-400'
+                  }`}>
+                    {streamingMode === 'manual' && (
+                      <div className="w-2 h-2 bg-white rounded-full m-0.5" />
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-white font-medium mb-1">Manual Refresh</h4>
+                    <p className="text-gray-400 text-sm">
+                      Transactions are paused. Click "Refresh" to manually load new transactions
+                      when you're ready.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowSettings(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowConfirmModal(false)}
           />
-          
+
           {/* Modal */}
           <div className="relative bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md mx-4 shadow-xl">
             <div className="mb-4">
@@ -598,11 +778,11 @@ export default function Dashboard() {
                 Confirm Bulk Clear
               </h3>
               <p className="text-gray-300 text-sm">
-                You are about to clear {selectedIds.size} selected transaction{selectedIds.size !== 1 ? 's' : ''}. 
+                You are about to clear {selectedIds.size} selected transaction{selectedIds.size !== 1 ? 's' : ''}.
                 This action cannot be undone.
               </p>
             </div>
-            
+
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Type <span className="font-mono bg-gray-700 px-1 rounded">clear</span> to confirm:
@@ -623,7 +803,7 @@ export default function Dashboard() {
                 autoFocus
               />
             </div>
-            
+
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowConfirmModal(false)}
