@@ -39,12 +39,20 @@ const generateMockTransactions = (): Transaction[] => {
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => {
     setTransactions(generateMockTransactions())
   }, [])
 
   const clearFunds = async (transactionId: string) => {
+    const transaction = transactions.find(t => t.id === transactionId)
+    
+    // Check if high-value transaction and admin permission
+    if (transaction && transaction.amount > 10000 && !isSuperAdmin) {
+      return // Should not happen due to UI logic, but safety check
+    }
+    
     setProcessingIds(prev => new Set(prev).add(transactionId))
     
     // Mock API call with 1.5s delay
@@ -96,12 +104,38 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Portola Ops Dashboard
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Settlement monitoring and fund clearing operations
-            </p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  Portola Ops Dashboard
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  Settlement monitoring and fund clearing operations
+                </p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700">Super Admin</span>
+                  <button
+                    onClick={() => setIsSuperAdmin(!isSuperAdmin)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      isSuperAdmin ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isSuperAdmin ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </label>
+                {isSuperAdmin && (
+                  <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                    High-Value Clearing Enabled
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
@@ -129,48 +163,64 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {transactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {transaction.id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.clientName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(transaction.amount)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
-                        {transaction.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatTimestamp(transaction.timestamp)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {transaction.status === 'Pending' && (
-                        <button
-                          onClick={() => clearFunds(transaction.id)}
-                          disabled={processingIds.has(transaction.id)}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {processingIds.has(transaction.id) ? (
-                            <>
-                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Processing...
-                            </>
-                          ) : (
-                            'Clear Funds'
-                          )}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {transactions.map((transaction) => {
+                  const isHighValue = transaction.amount > 10000
+                  const canClearFunds = transaction.status === 'Pending' && (!isHighValue || isSuperAdmin)
+                  
+                  return (
+                    <tr 
+                      key={transaction.id} 
+                      className={`${isHighValue ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {transaction.id}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {transaction.clientName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={isHighValue ? 'font-semibold text-red-700' : ''}>
+                          {formatCurrency(transaction.amount)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(transaction.status)}`}>
+                          {transaction.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatTimestamp(transaction.timestamp)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {transaction.status === 'Pending' && (
+                          <button
+                            onClick={() => clearFunds(transaction.id)}
+                            disabled={processingIds.has(transaction.id) || !canClearFunds}
+                            className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                              canClearFunds
+                                ? 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                                : 'text-gray-500 bg-gray-200 cursor-not-allowed'
+                            }`}
+                          >
+                            {processingIds.has(transaction.id) ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing...
+                              </>
+                            ) : canClearFunds ? (
+                              'Clear Funds'
+                            ) : (
+                              'Requires Super Admin'
+                            )}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
